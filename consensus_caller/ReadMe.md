@@ -21,11 +21,11 @@ written in python3.4 venv by NDHall**
 
     -h --help     this message
     
-    -b --bam_file indexed bam file.
+    -b --bam_file indexed bam file
    
-    -o --output   output file as you intended it to be named. 
+    -o --output   full output name 
 
-    -d --depth    minimum acceptable depth of reads from whic
+    -d --depth    minimum acceptable depth of reads from which
                   to call a consensus. For position 1 of fasta
                   to be called A there must be 20 A's recovered
                   from that column. If A is the the number with 
