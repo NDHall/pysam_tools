@@ -3,9 +3,8 @@
 As with all consensus calling from maps, the quality of consensus sequence is reliant on the quality of the map from which it is derived. It is advisable to remove duplicates, and realign indels using tools such as picard and GATK prior to calling a consensus. 
 
 
-**requires pysam**
-
-** written in python3.4 venv by NDHall**
+**requires pysam
+written in python3.4 venv by NDHall**
 
 
 
