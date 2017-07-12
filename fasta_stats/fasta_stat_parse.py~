@@ -1,0 +1,96 @@
+"""
+
+For parsing output for characters by sequence per organism and determining
+if organisms have enough high quaility sequences to continue in an analysis.
+pandas_parse_fasta_stats.py output list of sequences with pass or fail indicated
+
+"""
+
+import numpy as np 
+import pandas as pd
+
+
+def write_pass_fail(f_name,dataFrame):
+    """
+    requires dataFrame to contain 3 columns
+    file_name = file name
+    seq_name  = sequence name to be returned in files
+    passed    = column indicating pass or fail of some
+                required test.  
+    """
+    f_stem= ".".join(f_name.split(".")[:-1])+".list"
+    pass_f_name = "pass_%s" %( f_stem )
+    fail_f_name = "fail_%s" %( f_stem )
+    dataFrame[(dataFrame.file_name == f_name)  & ( dataFrame.passed =='passed' )]['seq_name'].to_csv(pass_f_name,index=False   )
+    dataFrame[(dataFrame.file_name == f_name)  & ( dataFrame.passed =='fail' )]['seq_name'].to_csv(fail_f_name,index=False   )
+
+
+
+def call_pass_fail(fasta_stats):
+
+
+
+fasta_stats = pd.read_csv('/home/ndh0004/Dropbox/MitoGenes/Mega/GATK_V4_Ana/exon_fasta_stat.csv')
+
+print(fasta_stats.head())
+print (fasta_stats.query('N/len*100 >10' ).head())
+
+fasta_stats["source"]=fasta_stats['seq_name'].str.split("_",1).apply(lambda x :x[0]).astype('category')
+"""
+to get first string of column .apply() was given lambda, on the the fly function.
+written to extract first column. The .apply() method required because without
+something like fasta_stats['seq_name'].str.split("_",1)[0] only outputs first row
+this is not the desired behavior here. 
+
+"""
+
+fasta_stats["cov"]=fasta_stats[['A','T','C','G']].sum(axis = 1)
+fasta_stats["nocov"]=fasta_stats[['N','P']].sum(axis = 1)
+fasta_stats["per_cov"]= fasta_stats["cov"]/ ( fasta_stats["nocov"]+fasta_stats["cov"] ) * 100
+fasta_stats["passed"] = np.where(((fasta_stats['N_rel_freq' ]< 5) & (fasta_stats['N'] <10 ) & (fasta_stats['P_rel_freq'] <2 )), "passed","fail")
+
+
+"""
+creating pass uses numpy.where(conditional , value_if_true, value_if_false )
+Each column tested in the pandas DataFrame has to be set off individually 
+for the test to work. numpy.where() supplants an overly complex application
+of apply.(lambda)
+
+Finally by calling it on a per sequence basis it is possible to now create best alignments for
+all the data we have available and then subsample, these down. 
+"""
+
+
+print (fasta_stats.head())
+
+grouped =  fasta_stats.groupby('source', as_index=False ).per_cov.mean()
+
+#pd.DataFrame( grouped.sizes().reset_index(name= "group_count"))
+print ( grouped["per_cov"].head()) 
+
+print( grouped.describe())
+
+
+
+grouped["passed"] = grouped["per_cov"].apply( lambda x :  "passed"  if x > 50 else  "fail" ) 
+print( grouped.head())
+
+p='/home/ndh0004/Dropbox/MitoGenes/Mega/GATK_V4_Ana/pass_fail_exon_fasta_stat.csv'
+
+ret_analysis = fasta_stats[["file_name","seq_name","passed"]]
+
+print (ret_analysis.head())
+
+for f_name in ret_analysis.file_name.unique():
+
+    write_pass_fail(f_name, ret_analysis)
+#   f_stem= ".".join(f_name.split(".")[:-1])+".list"
+#   pass_f_name = "pass_%s" %( f_stem )
+#   fail_f_name = "fail_%s" %( f_stem )
+#   print(f_name,"unique")
+#   print( ret_analysis[(ret_analysis.file_name == f_name)  & ( ret_analysis.passed =='passed' )].head() )
+
+
+
+grouped.to_csv(p, sep='\t') 
+
