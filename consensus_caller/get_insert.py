@@ -4,6 +4,15 @@
 
 import pysam
 from collections import Counter
+import logging
+
+LEVELS = {'debug': logging.DEBUG,       
+'info': logging.INFO,
+'warning': logging.WARNING,
+'error': logging.ERROR,
+'critical': logging.CRITICAL}
+
+logging.basicConfig(level=logging.WARNING)
 
 def message(case, variables):
     if case=="cstring_error":
@@ -44,6 +53,25 @@ def message(case, variables):
         with intron padding, Cigar
         string == "N": 
         read: %s \n\n""" %( variables)
+
+    elif case == "complete" :
+        bam, fasta, num_del, ins, N, P = variables 
+        message="""
+        Finished processing %s 
+        Consensus sequence is written to %s:
+        Total of %i deletions
+        Total of %i insertions
+        Total of %i bases below cutoff
+        Total of %i bases with no coverage
+        Breakdown by Contig.
+
+""" %( bam, fasta, num_del, ins, N, P ) 
+
+    elif case == "duplicate_contig" :
+        message="""
+        Duplicate contig %s discovered.\n\n""" %s( variables )
+
+
 
     return message
 
@@ -141,7 +169,7 @@ def return_counter_for_col(pileupcolumn):
             
 
 
-                to_append="D%s" %( get_insert(pileupread,pileupcolumn.pos)[1:])
+                to_append="D%s" %( get_insert(pileupread,pileupcolumn.pos)[1:]) # this works because the raw coordinates return the base in the read before the deletion + the insertion. So that read has to be trimmed off.
             else :
                 to_append="D"
             summary_list.append(to_append)
@@ -180,19 +208,71 @@ def parse_pileup( samfile, min_req=20):
     contig=None
     output_fasta_dict={}
     debug_pos=[]
-   
-
+    num_del = []
+    num_ins = []
+    prev_col = 0
+    prev_contig = None
     for pileupcolumn in samfile.pileup():
         dict_str=''
+        padding = ''
         column_dict, contig = return_counter_for_col(pileupcolumn)
+        logging.debug("\n\nbegining of padding_loop",contig,  output_fasta_dict.keys())
+        logging.debug("padding conditional", pileupcolumn.pos - prev_col >1 , prev_contig == contig , contig in output_fasta_dict.keys())
+        if prev_contig != contig:
+            logging.debug( "contig reset", prev_contig , contig)
+            prev_contig = contig	
+            padding = ''
+            prev_col = pileupcolumn.pos
+           
+
+ 
+
+
+        elif  pileupcolumn.pos - prev_col >1 and prev_contig == contig and contig in output_fasta_dict.keys() :
+            padding_int = pileupcolumn.pos - prev_col -1
+            padding= "".join(["P"] * padding_int )
+            logging.debug( "padding calculated", contig, padding, pileupcolumn.pos, prev_col )
+ 
+        else:
+            padding = ''
+
+
+        # the above conditionals add internal padding.
+        # briefly, 
+	    # if checks that prev_col and mpileup.pos are
+        #     on the same contig. If not there is no need for padding
+        #     but a contig reset is required.
+        # elif sets padding if step between positionsis greater than 1
+        # else there is no need for padding.
+        # padding is maintained as string and added to string character
+        # returned by  function return_max_value().
+
+           
+
         ret_max, ret_support  = return_max_value(column_dict)
-        print(contig, pileupcolumn.pos, ret_max, ret_support, column_dict)
+
+        logging.debug("Begin append conditionals",contig, pileupcolumn.pos, ret_max, ret_support, column_dict)
+        logging.debug( "Contig",contig, "padding", padding)
         if ret_support >= min_req :
-            if ret_max != "D":
-                output_fasta_dict.setdefault(contig,["P"] * pileupcolumn.pos ).append(ret_max)
+            if "D" not in ret_max:
+                output_fasta_dict.setdefault(contig,["P"] * pileupcolumn.pos ).append( padding + ret_max)
+                #print ( "if", contig, ["P"] * pileupcolumn.pos, pileupcolumn.pos )
+                logging.debug("No-Delete", contig, pileupcolumn.pos, min_req,"min_req")
+                if len(ret_max)> 1:
+                    num_ins.append(contig)
+            elif "D" in ret_max and len(ret_max) >1 :
+                num_del.append(contig) 
+                logging.debug( "deletion", contig, ["P"] * pileupcolumn.pos, pileupcolumn.pos )
+                output_fasta_dict.setdefault(contig,["P"] * pileupcolumn.pos ).append( padding + ret_max[1:])
+                logging.debug("Delete", contig, pileupcolumn.pos,  min_req,"min_req")
+            elif "D" in ret_max and len(ret_max)==1:
+                num_del.append(contig)
         elif ret_support < min_req :
-            if ret_max != "D":
-                output_fasta_dict.setdefault(contig,["P"] * pileupcolumn.pos ).append("N") 
+            output_fasta_dict.setdefault(contig,["P"] * pileupcolumn.pos ).append( padding + "N") 
+            #print("Low-support", contig, pileupcolumn.pos, output_fasta_dict[contig])
+            logging.debug("Low-support", contig, prev_contig, pileupcolumn.pos, prev_col,  min_req,"min_req",padding,
+                  ( pileupcolumn.pos - prev_col >1) ,(  prev_contig == contig )
+                          )
 
                     # even if it was an insertion, this 
                     # okay, because the insertion is not 
@@ -206,27 +286,59 @@ def parse_pileup( samfile, min_req=20):
                     # the first position it is padded with character 
                     # P. This is to distguish it from the N used for
                     # bases that do not meet the minimum requirement.
+        prev_col = pileupcolumn.pos
+        logging.debug("Keys at for output_fasta_dict",output_fasta_dict.keys(),"\nreturned for contig",contig)
  
             
-    return output_fasta_dict
+    return [output_fasta_dict , Counter(num_del), Counter(num_ins)]
 
 
 def parse_samfile(sam_file_name, out_file, min_req=20):
 
     samfile = pysam.AlignmentFile(sam_file_name, "rb" )
 
-    output_fasta_dict = parse_pileup( samfile, min_req)
+    output_fasta_dict ,num_del, num_ins = parse_pileup( samfile, min_req)
     f=open(out_file, 'w')
-    
+    P = 0
+    N = 0
+    padding_ins_dict={}
     for contig in output_fasta_dict:
+        local_p = 0 
+        local_n = 0
+        contig_len = 0 
         f.write(">%s\n" %(contig))
         f.write( "".join(output_fasta_dict[contig]) )
         f.write("\n")
+        local_p = "".join(output_fasta_dict[contig]).count("P")
+        local_n = "".join(output_fasta_dict[contig]).count("N")
+        contig_len = len( output_fasta_dict[contig] )
+        assert (contig not in padding_ins_dict), message("duplicate_contig", contig)
+        padding_ins_dict[contig] = [local_p, local_n, contig_len ]
+        P += local_p
+        N += local_n 
     f.close()
 
             
     samfile.close()
 
+    print( message("complete", [ sam_file_name, out_file, len(num_del.values()), len(num_ins.values()), N, P]))
+    print ("\n\n\t\tcontig\tlen\tins\tdel\tlow-cov\tno-cov" )
+    for contig in padding_ins_dict :
+       P, N, contig_len = padding_ins_dict[contig]
+
+       if contig in num_ins.keys():
+           num_ins_ret = num_ins[contig]
+       else:
+           num_ins_ret = 0 
+       if contig in num_del.keys():
+           num_del_ret = num_del[contig]
+       else :
+           num_del_ret = 0    
+
+       print ( "\t\t%s\t%i\t%i\t%i\t%i\t%i" %( contig, contig_len, num_ins_ret, num_del_ret, N, P ) )
+
+ 
+    
 
 
 if __name__  == "__main__"  :
