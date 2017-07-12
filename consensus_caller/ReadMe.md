@@ -1,6 +1,5 @@
-**pysam_consensus.py** is a simple consensus caller. It outputs the most abundant characters,( base, insertion, or deletion ) for each mapped nucleotide position. If the most abundant base falls below the preset cutoff, default 20, the base is reported as character N. Sequences are padded from the begining of the contig to the first mapped read position in the contig with character P. There is no internal padding for bases with zero coverage. 
-
-As with all consensus calling from maps, the quality of consensus sequence is reliant on the quality of the map from which it is derived. It is advisable to remove duplicates, and realign indels using tools such as picard and GATK prior to calling a consensus. 
+**pysam_consensus.py** is a simple consensus caller. It outputs the most abundant characters,( base, insertion, or deletion ) for each mapped nucleotide position. If the most abundant base falls below the preset cutoff, default 20, the base is reported as character N. Sequences are padded from the begining of the contig to the first mapped read position in the contig with character P and there is internal padding for regions that are not covered by any reads. 
+ 
 
 
 **requires pysam
