@@ -1,8 +1,10 @@
-**pysam_consensus.py** is a simple consensus caller it outputs the most abundant characters, base, insertion, or deletion for each mapped nucleotide position. If the most abundant base falls below preset cutoff default 20, base is reported as character N. Sequences are padded to the first mapped read position in the contig with character P. There is no internal padding for bases with zero coverage. These are not reported and can look like deletions which are not reported, since they are not present in the sequence. As with all consensus calling from maps, the quality of consensus sequence is reliant on the quality of the map from which it is derived. It is advisable to remove duplicates, and realign indels using tools such as picard and GATK prior to calling a consensus. 
+**pysam_consensus.py** is a simple consensus caller. It outputs the most abundant characters,( base, insertion, or deletion ) for each mapped nucleotide position. If the most abundant base falls below the preset cutoff, default 20, the base is reported as character N. Sequences are padded from the begining of the contig to the first mapped read position in the contig with character P. There is no internal padding for bases with zero coverage. 
+
+As with all consensus calling from maps, the quality of consensus sequence is reliant on the quality of the map from which it is derived. It is advisable to remove duplicates, and realign indels using tools such as picard and GATK prior to calling a consensus. 
 
 
-**requires pysam**
-** written in python3.4 venv by NDHall**
+**requires pysam
+written in python3.4 venv by NDHall**
 
 
 
@@ -19,11 +21,11 @@
 
     -h --help     this message
     
-    -b --bam_file indexed bam file.
+    -b --bam_file indexed bam file
    
-    -o --output   output file as you intended it to be named. 
+    -o --output   full output name 
 
-    -d --depth    minimum acceptable depth of reads from whic
+    -d --depth    minimum acceptable depth of reads from which
                   to call a consensus. For position 1 of fasta
                   to be called A there must be 20 A's recovered
                   from that column. If A is the the number with 
