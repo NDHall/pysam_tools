@@ -10,6 +10,8 @@ if a fasta is missing an accession a new blank accession
 of the appropriate length is added. Accessions are added in
 the order they are listed in the SEQ_LIST_FILE. 
 
+requires biopython, argparse
+
 usage:
 ```
 fasta_ghost.py [-h] [-f FASTA_FILES [FASTA_FILES ...]]
